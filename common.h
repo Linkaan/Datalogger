@@ -31,7 +31,11 @@
 #include <stdint.h>
 #include <errno.h>
 
+#ifdef FG_RELINC
+#include "../events/fgevents.h"
+#else
 #include <fgevents.h>
+#endif
 
 /* Define _GNU_SOURCE for pthread_timedjoin_np and asprintf */
 #ifndef _GNU_SOURCE
@@ -44,7 +48,7 @@
 #define TIMESTAMP_MAX_LENGTH 32
 
 /* Temporary defs before config file is setup */
-#define MASTER_IP "10.0.0.30"
+#define MASTER_IP "10.0.0.9"
 #define MASTER_PORT 1337
 
 /* String containing name the program is called with.

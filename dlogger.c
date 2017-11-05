@@ -37,8 +37,13 @@
 #include <string.h>
 #include <errno.h>
 
+#ifdef FG_RELINC
+#include "../serializer/events.h"
+#include "../events/fgevents.h"
+#else
 #include <events.h>
 #include <fgevents.h>
+#endif
 
 #include "common.h"
 #include "log.h"
@@ -46,16 +51,16 @@
 /* Forward declarations used in this file. */
 static int fg_handle_event (void *, struct fgevent *, struct fgevent *);
 
+/* Non-zero means we should exit the program as soon as possible */
+static sem_t keep_going;
+
 /* Signal handler for SIGINT, SIGHUP and SIGTERM */
 static void
 handle_sig (int signum)
 {
     struct sigaction new_action;
 
-    if (exev != NULL)
-        event_active (exev, EV_WRITE, 0);
-    else
-        exit (0);
+    sem_post (&keep_going);
 
     new_action.sa_handler = handle_sig;
     sigemptyset (&new_action.sa_mask);
@@ -97,17 +102,23 @@ main (void)
     ssize_t s;    
     struct thread_data tdata;
 
+    /* Initialize keep_going as binary semaphore initially 0 */
+    sem_init (&keep_going, 0, 0);
+
     memset (&tdata, 0, sizeof (tdata));
 
     handle_signals ();
 
-    s = fg_events_client_init_inet (&tdata.etdata, &fg_handle_event, &tdata,
-                                    MASTER_IP, MASTER_PORT, FG_SLAVE);
+    s = fg_events_client_init_inet (&tdata.etdata, &fg_handle_event, NULL,
+                                    &tdata, MASTER_IP, MASTER_PORT,
+                                    FG_DATALOGGER);
     if (s != 0)
       {
-        log_error ("error initializing fgevents");
-        return 1;
+        log_error_en (s, "error initializing fgevents");
+        //return 1;
       }
+
+    sem_wait (&keep_going);
 
     /* **************************************************************** */
     /*                                                                  */
@@ -137,7 +148,11 @@ fg_handle_event (void *arg, struct fgevent *fgev,
     switch (fgev->id)
       {
         case FG_SENSOR_DATA:
-            /* TODO: implement event */
+            _log_debug ("eventid: %d\n", fgev->id);
+            for (i = 0; i < fgev->length; i++)
+              {
+                _log_debug ("%d\n", fgev->payload[i]);
+              }
             break;
         default:
             _log_debug ("eventid: %d\n", fgev->id);
